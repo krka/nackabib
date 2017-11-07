@@ -1,0 +1,15 @@
+.color-long {
+  color: black;
+}
+.color-short {
+  color: blue;
+}
+.color-urgent {
+  color: orange;
+}
+.color-critical {
+  color: red;
+}
+.color-past {
+  color: gray;
+}
