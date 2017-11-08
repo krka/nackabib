@@ -121,8 +121,15 @@ public class Downloader {
     saveResource(dir, "catalogs");
     saveResource(dir, "reservations");
     saveResource(dir, "electronicmedia");
-    saveResource(dir, "settings");
+    saveSettings(dir);
     saveResource2(dir, "catalogs/libraries", "libraries");
+  }
+
+  private void saveSettings(final File dir) throws IOException, JSONException {
+    final JSONObject value = (JSONObject) getResource("settings");
+    // This field is both useless and very volatile
+    value.remove("id");
+    writeFile(dir, "settings", value);
   }
 
   private void saveResource(final File dir, final String name) throws IOException, JSONException {
@@ -130,28 +137,37 @@ public class Downloader {
   }
 
   private void saveResource2(final File dir, final String path, final String fileName) throws IOException, JSONException {
-    final String value = getResource(path);
+    final Object value = getResource(path);
     writeFile(dir, fileName, value);
   }
 
-  private void writeFile(final File dir, final String name, String value)
+  private void writeFile(final File dir, final String name, Object value)
       throws IOException, JSONException {
-    if (value.startsWith("{")) {
-      value = new JSONObject(value).toString(2);
-    } else if (value.startsWith("[")) {
-      value = new JSONArray(value).toString(2);
-    }
-    FileUtils.write(new File(dir, name), value, Charsets.UTF_8);
+    FileUtils.write(new File(dir, name), toString(value), Charsets.UTF_8);
   }
 
-  private String getResource(final String path) throws IOException {
+  private String toString(final Object value) throws JSONException {
+    if (value instanceof JSONObject) {
+      return ((JSONObject) value).toString(2);
+    }
+    if (value instanceof JSONArray) {
+      return ((JSONArray) value).toString(2);
+    }
+    return String.valueOf(value);
+  }
+
+  private Object getResource(final String path) throws IOException, JSONException {
     final String baseUri = "https://bib.nacka.se/api/";
 
     final HttpGet request = getRequest(baseUri + path);
-//    request.setHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
-//    request.setHeader("Accept-Language", "en-US,en;q=0.5");
-//    request.setHeader("Accept-Encoding", "gzip, deflate, br");
-    return sendWaitForCache(request);
+    final String s = sendWaitForCache(request);
+    if (s.startsWith("{")) {
+      return new JSONObject(s);
+    } else if (s.startsWith("[")) {
+      return new JSONArray(s);
+    } else {
+      return s;
+    }
   }
 
   private static HttpGet getRequest(final String value) {
