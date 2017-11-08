@@ -6,6 +6,6 @@ if [ $? == 0 ] ; then
   echo "Already installed!"
 else
   echo "Installing..."
-  (crontab -l 2> /dev/null; echo "15 8,12,16,20 * * * $RUNNABLE") | crontab -
+  (crontab -l 2> /dev/null; echo "0,15,30,45 8-20 * * * $RUNNABLE") | crontab -
 fi
 
