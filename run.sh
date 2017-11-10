@@ -5,7 +5,7 @@ cd $DIR
 rm -f last_run.out last_run.err
 
 # If the data has been updated within the last 4 hours, exit early
-if [ "x" != "x$(find data/ -cmin -240)" ] ; then
+if [ "x" != "x$(find data/* -cmin -240)" ] ; then
   echo "Data updated recently, skipping run" >> last_run.out
 else
   mvn package >> last_run.out 2>> last_run.err

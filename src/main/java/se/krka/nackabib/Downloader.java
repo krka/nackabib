@@ -34,13 +34,13 @@ public class Downloader {
     final String timestamp = Util.getCurrentTimestamp();
     final File downloadDir = FileUtils.getFile(baseDir, timestamp);
     final File inprogressDir = FileUtils.getFile(baseDir, timestamp + ".inprogress");
-    FileUtils.forceMkdir(inprogressDir);
-    System.out.println("Writing to " + inprogressDir.getAbsolutePath());
     try {
+      FileUtils.forceMkdir(inprogressDir);
+      System.out.println("Writing to " + inprogressDir.getAbsolutePath());
       download(config, inprogressDir);
       System.out.println("Move " + inprogressDir.getName() + " to " + downloadDir.getName());
       FileUtils.moveDirectory(inprogressDir, downloadDir);
-    } catch (final Exception e) {
+    } catch (final Throwable e) {
       FileUtils.deleteDirectory(inprogressDir);
       throw e;
     }

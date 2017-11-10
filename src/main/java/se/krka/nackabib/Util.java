@@ -25,7 +25,7 @@ public class Util {
   public static List<File> getDirectories(final File baseDir) {
     final List<File> list = Lists.newArrayList();
     for (File file : baseDir.listFiles()) {
-      if (file.isDirectory()) {
+      if (file.isDirectory() && isTimestamp(file)) {
         list.add(file);
       }
     }
@@ -41,8 +41,19 @@ public class Util {
     final File mostRecent = directories.get(directories.size() - 1);
 
     final Temporal now = Clock.systemDefaultZone().instant();
-    final String name = mostRecent.getName();
-    final LocalDateTime latest = LocalDateTime.parse(name, FORMATTER);
+    final LocalDateTime latest = parseFilename(mostRecent);
     return Duration.between(latest.toInstant(ZoneOffset.UTC), now);
+  }
+
+  private static LocalDateTime parseFilename(final File dir) {
+    return LocalDateTime.parse(dir.getName(), FORMATTER);
+  }
+
+  private static boolean isTimestamp(final File dir) {
+    try {
+      return parseFilename(dir) != null;
+    } catch (Exception e) {
+      return false;
+    }
   }
 }
