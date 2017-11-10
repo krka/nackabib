@@ -1,15 +1,33 @@
+p, th, td, h1, h2, h3, h4 {
+  font-family: sans-serif;
+}
+
+th, td {
+  padding-left: 0.5em;
+  text-align: left;
+}
+thead tr th {
+  border-bottom: 1px black solid;
+}
+
+
 .color-long {
   color: black;
+  font-family: monospace;
 }
 .color-short {
   color: blue;
+  font-family: monospace;
 }
 .color-urgent {
   color: orange;
+  font-family: monospace;
 }
 .color-critical {
   color: red;
+  font-family: monospace;
 }
 .color-past {
   color: gray;
+  font-family: monospace;
 }

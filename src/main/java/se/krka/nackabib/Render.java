@@ -14,6 +14,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.SortedSet;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -25,6 +27,7 @@ public class Render {
   private final String scriptText;
   private final String style;
   private String mostRecentTimestamp;
+  private List<Reservation> reservationsReady;
   private List<Reservation> reservations;
   private List<Loan> history;
   private List<Loan> loans;
@@ -72,9 +75,21 @@ public class Render {
         .compare(o1.title, o2.title)
         .result());
 
-    reservations = Lists.newArrayList(reservationsSet);
-    reservations.sort((o1, o2) -> ComparisonChain.start()
+    reservationsReady = reservationsSet.stream()
+        .filter(r -> !r.lastFetchDate.equals(""))
+        .collect(Collectors.toList());
+
+    reservationsReady.sort((o1, o2) -> ComparisonChain.start()
         .compare(o2.lastFetchDate, o1.lastFetchDate)
+        .compare(o1.username, o2.username)
+        .compare(o1.author, o2.author)
+        .compare(o1.title, o2.title)
+        .result());
+
+    reservations = reservationsSet.stream()
+        .filter(r -> r.lastFetchDate.equals(""))
+        .collect(Collectors.toList());
+    reservations.sort((o1, o2) -> ComparisonChain.start()
         .compare(o1.reservedFrom, o2.reservedFrom)
         .compare(o1.username, o2.username)
         .compare(o1.author, o2.author)
@@ -148,79 +163,96 @@ public class Render {
     sb.append("<h3>Konton</h3>\n");
     sb.append(Joiner.on(", ").join(ImmutableSortedSet.copyOf(displayNames.values())));
 
-    if (!reservations.isEmpty()) {
-      sb.append("<h3>Reservationer</h3>\n");
-      sb.append("<pre>\n");
-      final List<Grouper.Group<Reservation, String>> grouped =
-          Grouper.groupBy(reservations, Reservation::getUsername);
-      for (Grouper.Group<Reservation, String> group : grouped) {
-        sb.append(displayNames.get(group.getKey()));
-        sb.append("\n");
-        for (Reservation reservation : group.getObjects()) {
-          sb.append("  ");
-          if (!reservation.lastFetchDate.equals("")) {
-            sb.append("Hämtas senast: ").append(dateSpan(reservation.lastFetchDate));
-          } else {
-            sb.append("Reservades:    ").append(historic(reservation.reservedFrom));
-          }
-          sb.append("  (");
-          sb.append(reservation.queueNumber);
-          sb.append(") ");
-          sb.append(reservation.author);
-          sb.append(": ");
-          sb.append(reservation.title);
-          sb.append("\n");
-        }
-      }
-      sb.append("</pre>\n");
-    }
+    showReservation(sb, "Att hämta", reservationsReady, "Hämta senast", r -> dateSpan(r.lastFetchDate));
+    showReservation(sb, "Reservationer", reservations, "Från", r -> historic(r.reservedFrom));
 
-
-    if (!loans.isEmpty()) {
-      sb.append("<h3>Lån</h3>\n");
-      sb.append("<pre>\n");
-      for (Grouper.Group<Loan, String> group : Grouper.groupBy(loans, Loan::getUsername)) {
-        sb.append(displayNames.get(group.getKey()));
-        sb.append("\n");
-        for (Loan loan : group.getObjects()) {
-          sb.append("  ");
-          sb.append(dateSpan(loan.returnDate));
-          sb.append("  ");
-          sb.append(loan.renewable ? "[L] " : "    ");
-          sb.append(loan.author);
-          sb.append(": ");
-          sb.append(loan.title);
-          sb.append("\n");
-        }
-      }
-      sb.append("</pre>\n");
-    }
-
-    if (!history.isEmpty()) {
-      sb.append("<h3>Historik</h3>\n");
-      sb.append("<pre>\n");
-      for (Grouper.Group<Loan, String> group : Grouper.groupBy(history, Loan::getUsername)) {
-        sb.append(displayNames.get(group.getKey()));
-        sb.append("\n");
-        for (Loan loan : group.getObjects()) {
-          sb.append("  ");
-          sb.append(historic(loan.returnDate));
-          sb.append("  ");
-          sb.append(loan.renewable ? "[L] " : "    ");
-          sb.append(loan.author);
-          sb.append(": ");
-          sb.append(loan.title);
-          sb.append("\n");
-        }
-      }
-      sb.append("</pre>\n");
-    }
+    showLoans(sb, "Lån", loans, "Tillbaka senast", loan -> dateSpan(loan.returnDate));
+    showLoans(sb, "Historik", history, "Tillbaka senast", loan -> historic(loan.returnDate));
 
     sb.append("<script>\n").append(scriptText).append("\n</script>\n");
     sb.append("</body></html>\n");
     String s = sb.toString();
 
     FileUtils.write(file, s, Charsets.UTF_8);
+  }
+
+  private void showReservation(final StringBuilder sb, final String header, final List<Reservation> list,
+                               final String dateColumn,
+                               final Function<Reservation, String> dateSupplier) {
+    if (!list.isEmpty()) {
+      sb.append("<h3>").append(header).append("</h3>\n");
+      final List<Grouper.Group<Reservation, String>> grouped =
+          Grouper.groupBy(list, Reservation::getUsername);
+      for (Grouper.Group<Reservation, String> group : grouped) {
+        sb.append("<h4>");
+        sb.append(displayNames.get(group.getKey()));
+        sb.append("</h4>");
+        sb.append("\n");
+        sb.append("<table><thead><tr>");
+        sb.append("<th>").append(dateColumn).append("</th>");
+        sb.append("<th>Köplats</th>");
+        sb.append("<th>Författare</th>");
+        sb.append("<th>Titel</th>");
+        sb.append("</tr></thead>\n");
+        sb.append("<tbody>\n");
+        for (Reservation reservation : group.getObjects()) {
+          sb.append("<tr>");
+          sb.append("<td>");
+          sb.append(dateSupplier.apply(reservation));
+          sb.append("</td>");
+          sb.append("<td>");
+          sb.append(reservation.queueNumber);
+          sb.append("</td>");
+          sb.append("<td>");
+          sb.append(reservation.author);
+          sb.append("</td>");
+          sb.append("<td>");
+          sb.append(reservation.title);
+          sb.append("</td>");
+          sb.append("</tr>\n");
+        }
+        sb.append("</tbody></table>\n");
+      }
+    }
+  }
+
+  private void showLoans(
+      final StringBuilder sb,
+      final String header,
+      final List<Loan> list,
+      final String dateColumn,
+      final Function<Loan, String> dateSupplier) {
+    if (!list.isEmpty()) {
+      sb.append("<h3>").append(header).append("</h3>\n");
+      final List<Grouper.Group<Loan, String>> grouped =
+          Grouper.groupBy(list, Loan::getUsername);
+      for (Grouper.Group<Loan, String> group : grouped) {
+        sb.append("<h4>");
+        sb.append(displayNames.get(group.getKey()));
+        sb.append("</h4>");
+        sb.append("\n");
+        sb.append("<table><thead><tr>");
+        sb.append("<th>").append(dateColumn).append("</th>");
+        sb.append("<th>Författare</th>");
+        sb.append("<th>Titel</th>");
+        sb.append("</tr></thead>\n");
+        sb.append("<tbody>\n");
+        for (Loan loan : group.getObjects()) {
+          sb.append("<tr>");
+          sb.append("<td>");
+          sb.append(dateSupplier.apply(loan));
+          sb.append("</td>");
+          sb.append("<td>");
+          sb.append(loan.author);
+          sb.append("</td>");
+          sb.append("<td>");
+          sb.append(loan.title);
+          sb.append("</td>");
+          sb.append("</tr>\n");
+        }
+        sb.append("</tbody></table>\n");
+      }
+    }
   }
 
   private String dateSpan(final String date) {
