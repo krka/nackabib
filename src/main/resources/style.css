@@ -2,6 +2,9 @@ p, th, td, h1, h2, h3, h4 {
   font-family: sans-serif;
 }
 
+table {
+  border-spacing: 0.5em 0.2em;
+}
 th, td {
   padding-left: 0.5em;
   text-align: left;
@@ -9,7 +12,6 @@ th, td {
 thead tr th {
   border-bottom: 1px black solid;
 }
-
 
 .color-long {
   color: black;

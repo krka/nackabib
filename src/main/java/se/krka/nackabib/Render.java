@@ -1,15 +1,16 @@
 package se.krka.nackabib;
 
+import com.google.common.base.CharMatcher;
 import com.google.common.base.Charsets;
-import com.google.common.base.Joiner;
+import com.google.common.base.Splitter;
 import com.google.common.collect.ComparisonChain;
-import com.google.common.collect.ImmutableSortedSet;
-import com.google.common.collect.Lists;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.io.Resources;
 import java.io.File;
 import java.io.IOException;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -23,7 +24,10 @@ import org.json.JSONObject;
 
 public class Render {
 
-  private final Map<String, String> displayNames = Maps.newHashMap();
+  private final Map<String, User> usersByUserId = Maps.newTreeMap();
+  private final Map<String, User> usersByUsername = Maps.newTreeMap();
+  private final Set<String> shortNames = Sets.newHashSet();
+
   private final String scriptText;
   private final String style;
   private String mostRecentTimestamp;
@@ -46,6 +50,13 @@ public class Render {
 
     final String mostRecentName = mostRecent.getName();
 
+    addUsers(mostRecent);
+    for (File dir : allData) {
+      addUsers(dir);
+    }
+    System.out.println(usersByUserId);
+    System.out.println(usersByUsername);
+
     mostRecentTimestamp = mostRecentName
         .replace("T", " kl ")
         .replaceAll(":[0-9]{2}\\.[0-9]{3}$", "");
@@ -54,26 +65,23 @@ public class Render {
     historySet.removeAll(loansSet);
     final Set<Reservation> reservationsSet = getReservations(mostRecent);
 
-    addDisplayNames(mostRecent);
-    for (File dir : allData) {
-      addDisplayNames(dir);
-    }
-
-    loans = Lists.newArrayList(loansSet);
-    loans.sort((o1, o2) -> ComparisonChain.start()
+    loans = ImmutableList.sortedCopyOf(
+        (o1, o2) -> ComparisonChain.start()
         .compare(o1.returnDate, o2.returnDate)
-        .compare(o1.username, o2.username)
+        .compare(o1.user, o2.user)
         .compare(o1.author, o2.author)
         .compare(o1.title, o2.title)
-        .result());
+        .result(),
+        loansSet);
 
-    history = Lists.newArrayList(historySet);
-    history.sort((o1, o2) -> ComparisonChain.start()
+    history = ImmutableList.sortedCopyOf(
+        (o1, o2) -> ComparisonChain.start()
         .compare(o2.returnDate, o1.returnDate)
-        .compare(o1.username, o2.username)
+        .compare(o1.user, o2.user)
         .compare(o1.author, o2.author)
         .compare(o1.title, o2.title)
-        .result());
+        .result(),
+        historySet);
 
     reservationsReady = reservationsSet.stream()
         .filter(r -> !r.lastFetchDate.equals(""))
@@ -81,7 +89,7 @@ public class Render {
 
     reservationsReady.sort((o1, o2) -> ComparisonChain.start()
         .compare(o2.lastFetchDate, o1.lastFetchDate)
-        .compare(o1.username, o2.username)
+        .compare(o1.user, o2.user)
         .compare(o1.author, o2.author)
         .compare(o1.title, o2.title)
         .result());
@@ -91,21 +99,46 @@ public class Render {
         .collect(Collectors.toList());
     reservations.sort((o1, o2) -> ComparisonChain.start()
         .compare(o1.reservedFrom, o2.reservedFrom)
-        .compare(o1.username, o2.username)
+        .compare(o1.user, o2.user)
         .compare(o1.author, o2.author)
         .compare(o1.title, o2.title)
         .result());
   }
 
-  private void addDisplayNames(final File dir) throws IOException, JSONException {
+  private void addUsers(final File dir) throws IOException, JSONException {
     for (File subDir : dir.listFiles()) {
       if (!subDir.isDirectory()) {
         continue;
       }
-      final String username = subDir.getName();
-      final String displayName = readJsonArray(new File(subDir, "cards")).getJSONObject(0).getString("displayName");
-      displayNames.putIfAbsent(username, displayName);
+      final JSONArray cards = readJsonArray(new File(subDir, "cards"));
+      final String userId = cards.getJSONObject(0).getJSONObject("token").getString("userId");
+      if (usersByUserId.get(userId) == null) {
+        final String username = subDir.getName();
+        final String displayName = cards.getJSONObject(0).getString("displayName");
+        final String shortName = findShortName(displayName);
+        final User user = new User(userId, username, displayName, shortName);
+        usersByUserId.put(userId, user);
+        usersByUsername.put(username, user);
+        shortNames.add(shortName);
+      }
     }
+  }
+
+  private String findShortName(final String displayName) {
+    final String base = Splitter.on(CharMatcher.anyOf("- ")).splitToList(displayName)
+        .stream()
+        .filter(s1 -> !s1.isEmpty())
+        .map(s1 -> s1.substring(0, 1))
+        .reduce((a, b) -> a + b).orElse("");
+    if (shortNames.add(base)) {
+      return base;
+    }
+    for (int i = 0; i < 100; i++) {
+      if (shortNames.add(base + i)) {
+        return base + i;
+      }
+    }
+    return displayName;
   }
 
   private Set<Reservation> getReservations(final File dir) throws IOException, JSONException {
@@ -113,12 +146,21 @@ public class Render {
     for (File subDir : dir.listFiles()) {
       if (subDir.isDirectory()) {
         final String username = subDir.getName();
+        final User user = getUser(subDir, username);
         for (Object o : JsonIterator.of(readJsonArray(new File(subDir, "reservations")))) {
-          set.add(new Reservation(username, (JSONObject) o));
+          set.add(new Reservation(user, (JSONObject) o));
         }
       }
     }
     return set;
+  }
+
+  private User getUser(final File subDir, final String username) {
+    final User user = usersByUsername.get(username);
+    if (user == null) {
+      throw new RuntimeException("Could not find user in directory: " + subDir.getAbsolutePath());
+    }
+    return user;
   }
 
   private Set<Loan> getLoans(final File dir) throws IOException, JSONException {
@@ -140,9 +182,9 @@ public class Render {
       throws JSONException, IOException {
     for (File subDir : dir.listFiles()) {
       if (subDir.isDirectory()) {
-        final String username = subDir.getName();
+        final User user = getUser(subDir, subDir.getName());
         for (Object o : JsonIterator.of(readJsonArray(new File(subDir, "loans")))) {
-          set.add(new Loan(username, (JSONObject) o));
+          set.add(new Loan(user, (JSONObject) o));
         }
       }
     }
@@ -160,14 +202,13 @@ public class Render {
     sb.append("<p>Senast uppdaterat ");
     sb.append(mostRecentTimestamp);
     sb.append("</p>\n");
-    sb.append("<h3>Konton</h3>\n");
-    sb.append(Joiner.on(", ").join(ImmutableSortedSet.copyOf(displayNames.values())));
 
     showReservation(sb, "Att hämta", reservationsReady, "Hämta senast", r -> dateSpan(r.lastFetchDate));
     showReservation(sb, "Reservationer", reservations, "Från", r -> historic(r.reservedFrom));
 
     showLoans(sb, "Lån", loans, "Tillbaka senast", loan -> dateSpan(loan.returnDate));
     showLoans(sb, "Historik", history, "Tillbaka senast", loan -> historic(loan.returnDate));
+    showUsers(sb, ImmutableList.sortedCopyOf(usersByUserId.values()));
 
     sb.append("<script>\n").append(scriptText).append("\n</script>\n");
     sb.append("</body></html>\n");
@@ -181,14 +222,11 @@ public class Render {
                                final Function<Reservation, String> dateSupplier) {
     if (!list.isEmpty()) {
       sb.append("<h3>").append(header).append("</h3>\n");
-      final List<Grouper.Group<Reservation, String>> grouped =
-          Grouper.groupBy(list, Reservation::getUsername);
-      for (Grouper.Group<Reservation, String> group : grouped) {
-        sb.append("<h4>");
-        sb.append(displayNames.get(group.getKey()));
-        sb.append("</h4>");
-        sb.append("\n");
+      final List<Grouper.Group<Reservation, User>> grouped =
+          Grouper.groupBy(list, Reservation::getUser);
+      for (Grouper.Group<Reservation, User> group : grouped) {
         sb.append("<table><thead><tr>");
+        sb.append("<th>Låntagare</th>");
         sb.append("<th>").append(dateColumn).append("</th>");
         sb.append("<th>Köplats</th>");
         sb.append("<th>Författare</th>");
@@ -197,6 +235,9 @@ public class Render {
         sb.append("<tbody>\n");
         for (Reservation reservation : group.getObjects()) {
           sb.append("<tr>");
+          sb.append("<td>");
+          sb.append(group.getKey().shortName);
+          sb.append("</td>");
           sb.append("<td>");
           sb.append(dateSupplier.apply(reservation));
           sb.append("</td>");
@@ -224,14 +265,11 @@ public class Render {
       final Function<Loan, String> dateSupplier) {
     if (!list.isEmpty()) {
       sb.append("<h3>").append(header).append("</h3>\n");
-      final List<Grouper.Group<Loan, String>> grouped =
-          Grouper.groupBy(list, Loan::getUsername);
-      for (Grouper.Group<Loan, String> group : grouped) {
-        sb.append("<h4>");
-        sb.append(displayNames.get(group.getKey()));
-        sb.append("</h4>");
-        sb.append("\n");
+      final List<Grouper.Group<Loan, User>> grouped =
+          Grouper.groupBy(list, Loan::getUser);
+      for (Grouper.Group<Loan, User> group : grouped) {
         sb.append("<table><thead><tr>");
+        sb.append("<th>Låntagare</th>");
         sb.append("<th>").append(dateColumn).append("</th>");
         sb.append("<th>Författare</th>");
         sb.append("<th>Titel</th>");
@@ -239,6 +277,9 @@ public class Render {
         sb.append("<tbody>\n");
         for (Loan loan : group.getObjects()) {
           sb.append("<tr>");
+          sb.append("<td>");
+          sb.append(group.getKey().shortName);
+          sb.append("</td>");
           sb.append("<td>");
           sb.append(dateSupplier.apply(loan));
           sb.append("</td>");
@@ -252,6 +293,31 @@ public class Render {
         }
         sb.append("</tbody></table>\n");
       }
+    }
+
+  }
+  private void showUsers(
+      final StringBuilder sb,
+      final Collection<User> users) {
+    if (!users.isEmpty()) {
+      sb.append("<h3>").append("Låntagare").append("</h3>\n");
+      sb.append("<table><thead><tr>");
+      sb.append("<th>Förkortning</th>");
+      sb.append("<th>Namn</th>");
+      sb.append("</tr></thead>\n");
+      sb.append("<tbody>\n");
+      for (User user : users) {
+        sb.append("<tr>");
+        sb.append("<td>");
+        sb.append(user.shortName);
+        sb.append("</td>");
+        sb.append("<td>");
+        sb.append(user.displayName);
+        sb.append("</td>");
+        sb.append("</tr>\n");
+
+      }
+      sb.append("</tbody></table>\n");
     }
   }
 
@@ -273,14 +339,14 @@ public class Render {
 
   private static class Loan implements Comparable<Loan> {
     private final String id;
-    private final String username;
+    private final User user;
     private final String author;
     private final String title;
     private final String returnDate;
     private final boolean renewable;
 
-    public Loan(String username, JSONObject data) throws JSONException {
-      this.username = username;
+    public Loan(User user, JSONObject data) throws JSONException {
+      this.user = user;
       this.id = data.getString("id");
       this.author = data.getString("workAuthor");
       this.title = data.getString("workTitle");
@@ -288,8 +354,8 @@ public class Render {
       this.renewable = data.getBoolean("isRenewable");
     }
 
-    public String getUsername() {
-      return username;
+    public User getUser() {
+      return user;
     }
 
     @Override
@@ -319,15 +385,15 @@ public class Render {
 
   private static class Reservation implements Comparable<Reservation> {
     private final String id;
-    private final String username;
+    private final User user;
     private final String reservedFrom;
     private final String author;
     private final String title;
     private final String lastFetchDate;
     private final int queueNumber;
 
-    public Reservation(String username, JSONObject data) throws JSONException {
-      this.username = username;
+    public Reservation(User user, JSONObject data) throws JSONException {
+      this.user = user;
       this.id = data.getString("id");
       this.author = data.getString("workAuthor");
       this.title = data.getString("workTitle");
@@ -340,8 +406,8 @@ public class Render {
       this.queueNumber = data.getInt("queueNumber");
     }
 
-    public String getUsername() {
-      return username;
+    public User getUser () {
+      return user;
     }
 
     @Override
@@ -366,6 +432,25 @@ public class Render {
     @Override
     public int hashCode() {
       return id.hashCode();
+    }
+  }
+
+  private static class User implements Comparable<User> {
+    private final String userId;
+    private final String username;
+    private final String displayName;
+    private final String shortName;
+
+    private User(final String userId, final String username, final String displayName, final String shortName) {
+      this.userId = userId;
+      this.username = username;
+      this.displayName = displayName;
+      this.shortName = shortName;
+    }
+
+    @Override
+    public int compareTo(final User o) {
+      return shortName.compareTo(o.shortName);
     }
   }
 }
