@@ -35,6 +35,7 @@ public class Render {
   private List<Reservation> reservations;
   private List<Loan> history;
   private List<Loan> loans;
+  private JSONObject debts;
 
   public Render() throws IOException {
     scriptText = Resources.toString(Resources.getResource("script.js"), Charsets.UTF_8);
@@ -65,6 +66,7 @@ public class Render {
     historySet.removeAll(loansSet);
     final Set<Reservation> reservationsSet = getReservations(mostRecent);
 
+    debts = getDebts(mostRecent);
     loans = ImmutableList.sortedCopyOf(
         (o1, o2) -> ComparisonChain.start()
         .compare(o1.returnDate, o2.returnDate)
@@ -155,6 +157,22 @@ public class Render {
     return set;
   }
 
+  // I have never seen a debts objects so I don't know what to do yet
+  private JSONObject getDebts(final File dir) throws IOException, JSONException {
+    JSONObject map = new JSONObject();
+    for (File subDir : dir.listFiles()) {
+      if (subDir.isDirectory()) {
+        final String username = subDir.getName();
+        final User user = getUser(subDir, username);
+        final JSONArray debts = readJsonArray(new File(subDir, "debts"));
+        if (debts.length() != 0) {
+          map.put(user.shortName, debts);
+        }
+      }
+    }
+    return map;
+  }
+
   private User getUser(final File subDir, final String username) {
     final User user = usersByUsername.get(username);
     if (user == null) {
@@ -190,7 +208,7 @@ public class Render {
     }
   }
 
-  public void toHtml(final File file) throws IOException {
+  public void toHtml(final File file) throws IOException, JSONException {
     StringBuilder sb = new StringBuilder();
 
     sb.append("<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>Bibliotekslån</title>\n");
@@ -203,6 +221,7 @@ public class Render {
     sb.append(mostRecentTimestamp);
     sb.append("</p>\n");
 
+    showDebts(sb, "Skulder", debts);
     showReservation(sb, "Att hämta", reservationsReady, "Hämta senast", r -> dateSpan(r.lastFetchDate));
     showReservation(sb, "Reservationer", reservations, "Från", r -> historic(r.reservedFrom));
 
@@ -217,11 +236,24 @@ public class Render {
     FileUtils.write(file, s, Charsets.UTF_8);
   }
 
+  private void showDebts(final StringBuilder sb, final String header, final JSONObject debts) throws JSONException {
+    int total = 0;
+    for (String key : JsonKeyIterator.of(debts)) {
+      total += debts.getJSONArray(key).length();
+    }
+    if (debts.length() != 0) {
+      sb.append("<h3>").append(header).append(" (").append(total).append(")").append("</h3>\n");
+      for (String key : JsonKeyIterator.of(debts)) {
+        sb.append("<pre>").append(debts.getJSONArray(key).toString(2)).append("</pre>\n");
+      }
+    }
+  }
+
   private void showReservation(final StringBuilder sb, final String header, final List<Reservation> list,
                                final String dateColumn,
                                final Function<Reservation, String> dateSupplier) {
     if (!list.isEmpty()) {
-      sb.append("<h3>").append(header).append("</h3>\n");
+      sb.append("<h3>").append(header).append(" (").append(list.size()).append(")").append("</h3>\n");
       final List<Grouper.Group<Reservation, User>> grouped =
           Grouper.groupBy(list, Reservation::getUser);
       for (Grouper.Group<Reservation, User> group : grouped) {
@@ -264,7 +296,7 @@ public class Render {
       final String dateColumn,
       final Function<Loan, String> dateSupplier) {
     if (!list.isEmpty()) {
-      sb.append("<h3>").append(header).append("</h3>\n");
+      sb.append("<h3>").append(header).append(" (").append(list.size()).append(")").append("</h3>\n");
       final List<Grouper.Group<Loan, User>> grouped =
           Grouper.groupBy(list, Loan::getUser);
       for (Grouper.Group<Loan, User> group : grouped) {
