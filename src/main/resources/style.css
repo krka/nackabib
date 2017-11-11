@@ -3,15 +3,18 @@ p, th, td, h1, h2, h3, h4 {
 }
 
 table {
-  border-spacing: 0.5em 0.2em;
+  border-spacing: 0 0.2em;
 }
 th, td {
   padding-left: 0.5em;
+  padding-right: 1em;
   text-align: left;
 }
 thead tr th {
   border-bottom: 1px black solid;
 }
+tr:nth-child(even) {background: #EEE}
+tr:nth-child(odd) {background: #FFF}
 
 .color-long {
   color: black;
