@@ -149,7 +149,7 @@ public class Render {
       if (subDir.isDirectory()) {
         final String username = subDir.getName();
         final User user = getUser(subDir, username);
-        for (Object o : JsonIterator.of(readJsonArray(new File(subDir, "reservations")))) {
+        for (Object o : readJsonArray(new File(subDir, "reservations"))) {
           set.add(new Reservation(user, (JSONObject) o));
         }
       }
@@ -201,7 +201,7 @@ public class Render {
     for (File subDir : dir.listFiles()) {
       if (subDir.isDirectory()) {
         final User user = getUser(subDir, subDir.getName());
-        for (Object o : JsonIterator.of(readJsonArray(new File(subDir, "loans")))) {
+        for (Object o : readJsonArray(new File(subDir, "loans"))) {
           set.add(new Loan(user, (JSONObject) o));
         }
       }
@@ -238,12 +238,12 @@ public class Render {
 
   private void showDebts(final StringBuilder sb, final String header, final JSONObject debts) throws JSONException {
     int total = 0;
-    for (String key : JsonKeyIterator.of(debts)) {
+    for (String key : debts.keySet()) {
       total += debts.getJSONArray(key).length();
     }
     if (debts.length() != 0) {
       sb.append("<h3>").append(header).append(" (").append(total).append(")").append("</h3>\n");
-      for (String key : JsonKeyIterator.of(debts)) {
+      for (String key : debts.keySet()) {
         sb.append("<pre>").append(debts.getJSONArray(key).toString(2)).append("</pre>\n");
       }
     }
