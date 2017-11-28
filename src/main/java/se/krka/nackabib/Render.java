@@ -55,8 +55,6 @@ public class Render {
     for (File dir : allData) {
       addUsers(dir);
     }
-    System.out.println(usersByUserId);
-    System.out.println(usersByUsername);
 
     mostRecentTimestamp = mostRecentName
         .replace("T", " kl ")
