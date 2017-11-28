@@ -380,7 +380,7 @@ public class Render {
       this.id = data.getString("id");
       this.author = data.getString("workAuthor");
       this.title = data.getString("workTitle");
-      this.returnDate = data.getString("returnDate").replace("T00:00:00", "");
+      this.returnDate = scrubDate(data.getString("returnDate"));
       this.renewable = data.getBoolean("isRenewable");
     }
 
@@ -413,6 +413,10 @@ public class Render {
     }
   }
 
+  private static String scrubDate(final String s) {
+    return s.replace("T00:00:00", "").replace("T23:59:59", "");
+  }
+
   private static class Reservation implements Comparable<Reservation> {
     private final String id;
     private final User user;
@@ -427,9 +431,9 @@ public class Render {
       this.id = data.getString("id");
       this.author = data.getString("workAuthor");
       this.title = data.getString("workTitle");
-      this.reservedFrom = data.getString("reservedFrom").replace("T00:00:00", "");
+      this.reservedFrom = scrubDate(data.getString("reservedFrom"));
       if (data.getString("status").equals("fetchable")) {
-        this.lastFetchDate = data.getString("lastFetchDate").replace("T00:00:00", "");
+        this.lastFetchDate = scrubDate(data.getString("lastFetchDate"));
       } else {
         this.lastFetchDate = "";
       }
