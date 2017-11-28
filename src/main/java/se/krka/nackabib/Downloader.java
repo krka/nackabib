@@ -9,6 +9,8 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.apache.commons.io.FileUtils;
 import org.apache.http.Header;
 import org.apache.http.client.config.CookieSpecs;
@@ -27,6 +29,8 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 public class Downloader {
+
+  public static final Pattern PATTERN = Pattern.compile(" id=\"UrlToken\" value=\"([^\"]*)\"");
 
   public static void download(final File baseDir) throws Exception {
     final Config config = ConfigFactory.parseFile(FileUtils.getFile(baseDir, "bib.conf"));
@@ -90,6 +94,14 @@ public class Downloader {
   }
 
   private boolean login() throws IOException {
+    String initialResponse = sendWaitForCache(getRequest("https://bib.nacka.se/login"));
+    Matcher matcher = PATTERN.matcher(initialResponse);
+    if (!matcher.find()) {
+      throw new RuntimeException("Could not find UrlToken on login page");
+    }
+    String urlToken = matcher.group(1);
+
+
     final HttpPost request = new HttpPost();
     request.setURI(URI.create("https://auth.dvbib.se/"));
 
@@ -99,13 +111,11 @@ public class Downloader {
         new BasicNameValuePair("RememberLogin", "true"),
         new BasicNameValuePair(
             "ReturnUrl",
-            "https://bib.nacka.se:443/sv/library-page/fisks%C3%A4tra-bibliotek"),
-        new BasicNameValuePair(
-            "LoginUrl",
-            "https://bib.nacka.se/login?ReturnUrl=%2Fsv%2Flibrary-page%2Ffisks%25C3%25A4tra-bibliotek")
+            "https://bib.nacka.se:443/"),
+        new BasicNameValuePair("UrlToken", urlToken)
     ), "UTF-8"));
 
-    sendWaitForCache(request);
+    String response = sendFollowRedirect(request);
     return cookieStore.getCookies().stream()
         .filter(c -> c.getName().equals(".AspNetCore.Cookies"))
         .findAny()
@@ -172,6 +182,8 @@ public class Downloader {
 
   private static HttpGet getRequest(final String value) {
     final HttpGet request = new HttpGet();
+    //request.setHeader("Accept", "*/*");
+    //request.setHeader("Accept-Encoding", "gzip, deflate, br");
     request.setURI(URI.create(value));
     return request;
   }
@@ -196,7 +208,8 @@ public class Downloader {
   private String sendFollowRedirect(HttpUriRequest request)
       throws IOException {
     while (true) {
-      System.out.println("Sending request: " + request.getURI());
+      final URI uri = request.getURI();
+      System.out.println("Sending request: " + uri);
       final CloseableHttpResponse response = client.execute(request);
       final int statusCode = response.getStatusLine().getStatusCode();
 

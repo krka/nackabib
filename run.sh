@@ -8,7 +8,6 @@ rm -f last_run.out last_run.err
 if [ "x" != "x$(find data/* -cmin -240)" ] ; then
   echo "Data updated recently, skipping run" >> last_run.out
 else
-  mvn package >> last_run.out 2>> last_run.err
   java -jar target/nackabib-*-jar-with-dependencies.jar -d data -r index.html "$@" >> last_run.out 2>> last_run.err
 fi
 
