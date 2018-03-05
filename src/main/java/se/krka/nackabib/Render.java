@@ -252,17 +252,17 @@ public class Render {
                                final Function<Reservation, String> dateSupplier) {
     if (!list.isEmpty()) {
       sb.append("<h3>").append(header).append(" (").append(list.size()).append(")").append("</h3>\n");
+      sb.append("<table><thead><tr>");
+      sb.append("<th>Låntagare</th>");
+      sb.append("<th>").append(dateColumn).append("</th>");
+      sb.append("<th>Köplats</th>");
+      sb.append("<th>Författare</th>");
+      sb.append("<th>Titel</th>");
+      sb.append("</tr></thead>\n");
+      sb.append("<tbody>\n");
       final List<Grouper.Group<Reservation, User>> grouped =
           Grouper.groupBy(list, Reservation::getUser);
       for (Grouper.Group<Reservation, User> group : grouped) {
-        sb.append("<table><thead><tr>");
-        sb.append("<th>Låntagare</th>");
-        sb.append("<th>").append(dateColumn).append("</th>");
-        sb.append("<th>Köplats</th>");
-        sb.append("<th>Författare</th>");
-        sb.append("<th>Titel</th>");
-        sb.append("</tr></thead>\n");
-        sb.append("<tbody>\n");
         for (Reservation reservation : group.getObjects()) {
           sb.append("<tr>");
           sb.append("<td>");
@@ -282,8 +282,8 @@ public class Render {
           sb.append("</td>");
           sb.append("</tr>\n");
         }
-        sb.append("</tbody></table>\n");
       }
+      sb.append("</tbody></table>\n");
     }
   }
 
@@ -295,16 +295,16 @@ public class Render {
       final Function<Loan, String> dateSupplier) {
     if (!list.isEmpty()) {
       sb.append("<h3>").append(header).append(" (").append(list.size()).append(")").append("</h3>\n");
+      sb.append("<table><thead><tr>");
+      sb.append("<th>Låntagare</th>");
+      sb.append("<th>").append(dateColumn).append("</th>");
+      sb.append("<th>Författare</th>");
+      sb.append("<th>Titel</th>");
+      sb.append("</tr></thead>\n");
+      sb.append("<tbody>\n");
       final List<Grouper.Group<Loan, User>> grouped =
           Grouper.groupBy(list, Loan::getUser);
       for (Grouper.Group<Loan, User> group : grouped) {
-        sb.append("<table><thead><tr>");
-        sb.append("<th>Låntagare</th>");
-        sb.append("<th>").append(dateColumn).append("</th>");
-        sb.append("<th>Författare</th>");
-        sb.append("<th>Titel</th>");
-        sb.append("</tr></thead>\n");
-        sb.append("<tbody>\n");
         for (Loan loan : group.getObjects()) {
           sb.append("<tr>");
           sb.append("<td>");
@@ -321,8 +321,8 @@ public class Render {
           sb.append("</td>");
           sb.append("</tr>\n");
         }
-        sb.append("</tbody></table>\n");
       }
+      sb.append("</tbody></table>\n");
     }
 
   }
