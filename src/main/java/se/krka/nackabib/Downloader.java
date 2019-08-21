@@ -130,7 +130,6 @@ public class Downloader {
     saveResource(dir, "debts");
     saveResource(dir, "catalogs");
     saveResource(dir, "reservations");
-    saveResource(dir, "electronicmedia");
     saveSettings(dir);
     saveResource2(dir, "catalogs/libraries", "libraries");
   }
