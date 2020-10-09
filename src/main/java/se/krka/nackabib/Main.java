@@ -50,14 +50,16 @@ public class Main {
       final Duration timeSinceLastUpdate = Util.timeSinceLastUpdate(baseDir);
       boolean shouldDownload = options.forceDownload() || timeSinceLastUpdate.compareTo(MIN_WAIT_TIME) > 0;
 
+      final UserConfig config = new UserConfig(baseDir);
+
       if (shouldDownload) {
-        Downloader.download(baseDir);
+        Downloader.download(baseDir, config);
       } else {
         System.out.println("Already up to date, skipping download");
       }
 
       if (canRender && (options.forceRender() || shouldDownload)) {
-        final Render render = new Render();
+        final Render render = new Render(config);
         render.collectData(baseDir);
         render.toHtml(renderFile);
         System.out.println("Done rendering to " + renderFile);

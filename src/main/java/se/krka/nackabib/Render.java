@@ -10,6 +10,7 @@ import com.google.common.collect.Sets;
 import com.google.common.io.Resources;
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +31,7 @@ public class Render {
 
   private final String scriptText;
   private final String style;
+  private final UserConfig config;
   private String mostRecentTimestamp;
   private List<Reservation> reservationsReady;
   private List<Reservation> reservations;
@@ -37,7 +39,8 @@ public class Render {
   private List<Loan> loans;
   private JSONObject debts;
 
-  public Render() throws IOException {
+  public Render(UserConfig config) throws IOException {
+    this.config = config;
     scriptText = Resources.toString(Resources.getResource("script.js"), Charsets.UTF_8);
     style = Resources.toString(Resources.getResource("style.css"), Charsets.UTF_8);
   }
@@ -110,13 +113,16 @@ public class Render {
       if (!subDir.isDirectory()) {
         continue;
       }
+      final JSONObject settings = readJsonObject(new File(subDir, "settings"));
       final JSONArray cards = readJsonArray(new File(subDir, "cards"));
       final String userId = cards.getJSONObject(0).getJSONObject("token").getString("userId");
       if (usersByUserId.get(userId) == null) {
         final String username = subDir.getName();
         final String displayName = cards.getJSONObject(0).getString("displayName");
         final String shortName = findShortName(displayName);
-        final User user = new User(userId, username, displayName, shortName);
+        final String urlToken = settings.has("urltoken") ? settings.getString("urltoken") : "";
+        final String password = config.getUsersByUsername().get(username).getPassword();
+        final User user = new User(userId, username, displayName, shortName, password, urlToken);
         usersByUserId.put(userId, user);
         usersByUsername.put(username, user);
         shortNames.add(shortName);
@@ -330,6 +336,16 @@ public class Render {
       final StringBuilder sb,
       final Collection<User> users) {
     if (!users.isEmpty()) {
+      sb.append("<script>\n");
+      sb.append("users = {};");
+      for (User user : users) {
+        sb.append("users[\"" + user.shortName + "\"] = [" +
+                "\"" + user.urlToken + "\", " +
+                "\"" + user.username + "\", " +
+                "\"" + user.password + "\"" +
+                "];\n");
+      }
+      sb.append("</script>\n");
       sb.append("<h3>").append("Låntagare").append("</h3>\n");
       sb.append("<table><thead><tr>");
       sb.append("<th>Förkortning</th>");
@@ -342,7 +358,11 @@ public class Render {
         sb.append(user.shortName);
         sb.append("</td>");
         sb.append("<td>");
+        sb.append("<a href=\"javascript:login(")
+                .append("'").append(user.shortName).append("'")
+                .append(")\">");
         sb.append(user.displayName);
+        sb.append("</a>");
         sb.append("</td>");
         sb.append("</tr>\n");
 
@@ -365,6 +385,10 @@ public class Render {
 
   private JSONArray readJsonArray(final File file) throws JSONException, IOException {
     return new JSONArray(FileUtils.readFileToString(file, Charsets.UTF_8));
+  }
+
+  private JSONObject readJsonObject(final File file) throws JSONException, IOException {
+    return new JSONObject(FileUtils.readFileToString(file, Charsets.UTF_8));
   }
 
   private static class Loan implements Comparable<Loan> {
@@ -474,12 +498,17 @@ public class Render {
     private final String username;
     private final String displayName;
     private final String shortName;
+    private final String password;
+    private final String urlToken;
 
-    private User(final String userId, final String username, final String displayName, final String shortName) {
+    private User(final String userId, final String username, final String displayName, final String shortName,
+                 final String password, final String urlToken) {
       this.userId = userId;
       this.username = username;
       this.displayName = displayName;
       this.shortName = shortName;
+      this.password = password;
+      this.urlToken = urlToken;
     }
 
     @Override

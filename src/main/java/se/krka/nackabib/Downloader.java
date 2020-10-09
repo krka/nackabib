@@ -2,13 +2,19 @@ package se.krka.nackabib;
 
 import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableList;
+import com.google.common.io.BaseEncoding;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.io.FileUtils;
@@ -31,10 +37,9 @@ import org.json.JSONObject;
 public class Downloader {
 
   public static final Pattern PATTERN = Pattern.compile(" id=\"UrlToken\" value=\"([^\"]*)\"");
+  private String urlToken;
 
-  public static void download(final File baseDir) throws Exception {
-    final Config config = ConfigFactory.parseFile(FileUtils.getFile(baseDir, "bib.conf"));
-
+  public static void download(final File baseDir, UserConfig config) throws Exception {
     final String timestamp = Util.getCurrentTimestamp();
     final File downloadDir = FileUtils.getFile(baseDir, timestamp);
     final File inprogressDir = FileUtils.getFile(baseDir, timestamp + ".inprogress");
@@ -50,14 +55,17 @@ public class Downloader {
     }
   }
 
-  private static void download(final Config config, final File downloadDir) throws Exception {
-    final List<? extends Config> credentials = config.getConfigList("credentials");
-    for (Config credential : credentials) {
-      final String username = credential.getString("username");
-      final String password = credential.getString("password");
+  public static void main(String[] args) throws Exception {
+    File baseDir = new File("data");
+    download(new UserConfig(baseDir), baseDir);
+  }
 
-      final Downloader downloader = new Downloader(username, password);
-      final File dir = new File(downloadDir, username);
+  private static void download(final UserConfig config, final File downloadDir) throws Exception {
+    for (Map.Entry<String, UserConfig.User> entry : config.getUsersByUsername().entrySet()) {
+      final String key = entry.getKey();
+      final UserConfig.User user = entry.getValue();
+      final Downloader downloader = new Downloader(key, user.getPassword());
+      final File dir = new File(downloadDir, key);
       FileUtils.forceMkdir(dir);
       downloader.fetchAll(dir);
     }
@@ -94,16 +102,10 @@ public class Downloader {
   }
 
   private boolean login() throws IOException {
-    String initialResponse = sendWaitForCache(getRequest("https://bib.nacka.se/login"));
-    Matcher matcher = PATTERN.matcher(initialResponse);
-    if (!matcher.find()) {
-      throw new RuntimeException("Could not find UrlToken on login page");
-    }
-    String urlToken = matcher.group(1);
-
+    getUrlToken();
 
     final HttpPost request = new HttpPost();
-    request.setURI(URI.create("https://auth.dvbib.se/"));
+    request.setURI(URI.create(Login.BASE_URL));
 
     request.setEntity(new UrlEncodedFormEntity(ImmutableList.of(
         new BasicNameValuePair("Username", username),
@@ -111,7 +113,7 @@ public class Downloader {
         new BasicNameValuePair("RememberLogin", "true"),
         new BasicNameValuePair(
             "ReturnUrl",
-            "https://bib.nacka.se:443/"),
+                Login.RETURN_URL),
         new BasicNameValuePair("UrlToken", urlToken)
     ), "UTF-8"));
 
@@ -120,6 +122,15 @@ public class Downloader {
         .filter(c -> c.getName().equals(".AspNetCore.Cookies"))
         .findAny()
         .isPresent();
+  }
+
+  private void getUrlToken() throws IOException {
+    String initialResponse = sendWaitForCache(getRequest("https://bib.nacka.se/login"));
+    Matcher matcher = PATTERN.matcher(initialResponse);
+    if (!matcher.find()) {
+      throw new RuntimeException("Could not find UrlToken on login page");
+    }
+    urlToken = matcher.group(1);
   }
 
   void fetchAll(final File dir) throws Exception {
@@ -138,6 +149,8 @@ public class Downloader {
     final JSONObject value = (JSONObject) getResource("settings");
     // This field is both useless and very volatile
     value.remove("id");
+    value.put("username", username);
+    value.put("urltoken", urlToken);
     writeFile(dir, "settings", value);
   }
 

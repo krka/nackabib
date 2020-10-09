@@ -31,3 +31,29 @@ function update() {
   }
 }
 update();
+
+function input(name, value) {
+  var el = document.createElement("input");
+  el.value = value;
+  el.name = name;
+  el.type = "hidden";
+  return el;
+}
+
+function login(user) {
+  var data = users[user];
+  var urltoken = data[0];
+  var username = data[1];
+  var password = data[2];
+
+  var form = document.createElement("form");
+  form.method = "POST";
+  form.action = "https://auth.dvbib.se/";
+  form.appendChild(input("Username", username));
+  form.appendChild(input("Password", password));
+  form.appendChild(input("ReturnURL", "https://bib.nacka.se:443/"));
+  form.appendChild(input("RememberLogin", "true"));
+  form.appendChild(input("UrlToken", urltoken));
+  document.body.appendChild(form);
+  form.submit();
+}
