@@ -221,6 +221,7 @@ public class Render {
     sb.append("\n</style>\n");
     sb.append("</head>\n");
     sb.append("<body>\n");
+    sb.append("<div id=\"main-content\" class=\"hidden\">\n");
     sb.append("<p>Senast uppdaterat ");
     sb.append(mostRecentTimestamp);
     sb.append("</p>\n");
@@ -233,6 +234,10 @@ public class Render {
 
     showLoans(sb, "Lån", loans, "Tillbaka senast", loan -> dateSpan(loan.returnDate));
     showLoans(sb, "Historik", history, "Tillbaka senast", loan -> historic(loan.returnDate));
+    sb.append("</div>\n");
+    sb.append("<div id=\"logging-in\" class=\"hidden\">\n");
+    sb.append("<p>Loggar in på biblioteket. Var god vänta...</p>\n");
+    sb.append("</div>\n");
 
     sb.append("<script>\n").append(scriptText).append("\n</script>\n");
     sb.append("</body></html>\n");
@@ -359,9 +364,9 @@ public class Render {
         sb.append(user.shortName);
         sb.append("</td>");
         sb.append("<td>");
-        sb.append("<a href=\"javascript:login(")
-                .append("'").append(user.shortName).append("'")
-                .append(")\">");
+        sb.append("<a href=\"?login_as=")
+                .append(user.shortName)
+                .append("\" target=\"_blank\">");
         sb.append(user.displayName);
         sb.append("</a>");
         sb.append("</td>");

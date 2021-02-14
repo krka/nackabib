@@ -57,3 +57,11 @@ function login(user) {
   document.body.appendChild(form);
   form.submit();
 }
+
+const loginAs = new URLSearchParams(window.location.search).get('login_as');
+if (loginAs != null) {
+  document.getElementById("logging-in").className = "";
+  login(loginAs)
+} else {
+  document.getElementById("main-content").className = "";
+}
