@@ -225,13 +225,14 @@ public class Render {
     sb.append(mostRecentTimestamp);
     sb.append("</p>\n");
 
+    showUsers(sb, ImmutableList.sortedCopyOf(usersByUserId.values()));
+
     showDebts(sb, "Skulder", debts);
     showReservation(sb, "Att hämta", reservationsReady, "Hämta senast", r -> dateSpan(r.lastFetchDate));
     showReservation(sb, "Reservationer", reservations, "Från", r -> historic(r.reservedFrom));
 
     showLoans(sb, "Lån", loans, "Tillbaka senast", loan -> dateSpan(loan.returnDate));
     showLoans(sb, "Historik", history, "Tillbaka senast", loan -> historic(loan.returnDate));
-    showUsers(sb, ImmutableList.sortedCopyOf(usersByUserId.values()));
 
     sb.append("<script>\n").append(scriptText).append("\n</script>\n");
     sb.append("</body></html>\n");
