@@ -2,21 +2,15 @@ package se.krka.nackabib;
 
 import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableList;
-import com.google.common.io.BaseEncoding;
-import com.typesafe.config.Config;
-import com.typesafe.config.ConfigFactory;
+
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.net.URI;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
-import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.http.Header;
 import org.apache.http.client.config.CookieSpecs;
@@ -57,6 +51,7 @@ public class Downloader {
 
   public static void main(String[] args) throws Exception {
     File baseDir = new File("data");
+    Dedup.dedup(baseDir);
     download(new UserConfig(baseDir), baseDir);
   }
 

@@ -10,7 +10,6 @@ import com.google.common.collect.Sets;
 import com.google.common.io.Resources;
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;

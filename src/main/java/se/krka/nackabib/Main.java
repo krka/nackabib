@@ -52,6 +52,8 @@ public class Main {
 
       final UserConfig config = new UserConfig(baseDir);
 
+      Dedup.dedup(baseDir);
+
       if (shouldDownload) {
         Downloader.download(baseDir, config);
       } else {
